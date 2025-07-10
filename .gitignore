@@ -1,0 +1,20 @@
+# ignore dataset
+/data
+
+# ignore logs
+/logs
+
+# venv
+/srcnn
+
+# system files
+.DS_Store
+Thumbs.db
+
+# python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+
