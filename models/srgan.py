@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from .srresnet import SRResNet
 
 
+
 class Generator(nn.Module):
     def __init__(self, in_channels=3, out_channels=3, num_residual_blocks=5, upscale_factor=4):
         super(Generator, self).__init__()
@@ -14,8 +15,9 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, in_channels=3, num_filters=64):
+    def __init__(self, img_size=96, in_channels=3, num_filters=64):
         super(Discriminator, self).__init__()
+        self.img_size = img_size
         self.in_conv = nn.Sequential(
             nn.Conv2d(in_channels, num_filters, kernel_size=3, stride=1, padding=1),
             nn.LeakyReLU(0.2, inplace=True)
@@ -45,7 +47,9 @@ class Discriminator(nn.Module):
     
     def _dence_block(self):
         return nn.Sequential(
-            nn.Linear(16*16*512, 1024),
+            nn.AdaptiveAvgPool2d((6, 6)),
+            nn.Flatten(),
+            nn.Linear(512 * 6 * 6, 1024),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(1024, 1),
             nn.Sigmoid()
