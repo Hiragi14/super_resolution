@@ -4,6 +4,35 @@ import torch.nn.functional as F
 from torchvision.models import vgg16
 
 
+class VGGPerceptualLoss(torch.nn.Module):
+    def __init__(self):
+        super(VGGPerceptualLoss, self).__init__()
+        blocks = []
+        blocks.append(vgg16(pretrained=True).features[:4].eval())
+        blocks.append(vgg16(pretrained=True).features[4:9].eval())
+        blocks.append(vgg16(pretrained=True).features[9:16].eval())
+        blocks.append(vgg16(pretrained=True).features[16:23].eval())
+        blocks.append(vgg16(pretrained=True).features[23:30].eval())
+        for bl in blocks:
+            for p in bl:
+                p.requires_grad = False
+        self.blocks = torch.nn.ModuleList(blocks).cuda()
+        self.mean = torch.nn.Parameter(torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1), requires_grad=False).cuda()
+        self.std = torch.nn.Parameter(torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1), requires_grad=False).cuda()
+
+    def forward(self, fakeFrame, frameY):
+        fakeFrame = (fakeFrame - self.mean) / self.std
+        frameY = (frameY - self.mean) / self.std
+        loss = 0.0
+        x = fakeFrame
+        y = frameY
+        for block in self.blocks:
+            x = block(x)
+            y = block(y)
+            loss += torch.nn.functional.l1_loss(x, y)
+        return loss
+
+
 class SRGANLightningModule(pl.LightningModule):
     def __init__(self, generator, discriminator, lr=1e-4, beta1=0.9, beta2=0.999):
         super(SRGANLightningModule, self).__init__()
