@@ -16,9 +16,9 @@ class VGGPerceptualLoss(torch.nn.Module):
         for bl in blocks:
             for p in bl:
                 p.requires_grad = False
-        self.blocks = torch.nn.ModuleList(blocks).cuda()
-        self.mean = torch.nn.Parameter(torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1), requires_grad=False).cuda()
-        self.std = torch.nn.Parameter(torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1), requires_grad=False).cuda()
+        self.blocks = torch.nn.ModuleList(blocks)
+        self.mean = torch.nn.Parameter(torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1), requires_grad=False)
+        self.std = torch.nn.Parameter(torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1), requires_grad=False)
 
     def forward(self, fakeFrame, frameY):
         fakeFrame = (fakeFrame - self.mean) / self.std
@@ -41,7 +41,7 @@ class SRGANLightningModule(pl.LightningModule):
         self.lr = lr
         self.beta1 = beta1
         self.beta2 = beta2
-        self.content_loss = VGGPerceptualLoss().cuda()
+        self.content_loss = VGGPerceptualLoss()
         self.adversarial_loss = torch.nn.BCEWithLogitsLoss()
 
     def forward(self, x):
@@ -54,8 +54,6 @@ class SRGANLightningModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx, optimizer_idx):
         lr_images, hr_images = batch
-        real_labels = torch.ones(hr_images.size(0), 1, device=hr_images.device)
-        fake_labels = torch.zeros(hr_images.size(0), 1, device=hr_images.device)
         
         if optimizer_idx == 0:
             # Generator training step
@@ -64,7 +62,11 @@ class SRGANLightningModule(pl.LightningModule):
             self.set_requires_grad(self.generator, True)
             
             sr_images = self.generator(lr_images)
-            d_pred = self.discriminator(sr_images.detach().clone())
+            d_pred = self.discriminator(sr_images.detach())
+            
+            # define real and fake labels for the discriminator
+            label_shape = d_pred.shape
+            real_labels = torch.ones(label_shape, device=hr_images.device)
             
             # Calculate the content loss using VGG perceptual loss, adversarial loss using binary cross-entropy
             content_loss = self.content_loss(sr_images, hr_images)
@@ -74,10 +76,10 @@ class SRGANLightningModule(pl.LightningModule):
             # The weight for adversarial loss can be adjusted based on the desired balance(original paper uses 0.001)
             g_loss_perceptual = content_loss + adversarial_loss*0.001
             self.log_dict({
-                'g_loss_perceptual': g_loss_perceptual,
-                'g_loss_content': content_loss,
-                'g_loss_adv': adversarial_loss
-                })
+                'g_loss_perceptual': g_loss_perceptual.detach(),
+                'g_loss_content': content_loss.detach(),
+                'g_loss_adv': adversarial_loss.detach()
+                }, prog_bar=True)
             return g_loss_perceptual
         
         if optimizer_idx == 1:
@@ -88,13 +90,16 @@ class SRGANLightningModule(pl.LightningModule):
             
             sr_images = self.generator(lr_images)
             d_real = self.discriminator(hr_images)
-            d_fake = self.discriminator(sr_images.detach().clone())
+            d_fake = self.discriminator(sr_images.detach())
             
+            # define real and fake labels for the discriminator
+            real_labels = torch.ones(d_real.size(), device=hr_images.device)
+            fake_labels = torch.zeros(d_fake.size(), device=hr_images.device)
             real_loss = self.adversarial_loss(d_real, real_labels)
             fake_loss = self.adversarial_loss(d_fake, fake_labels)
             d_loss = (real_loss + fake_loss) / 2
             
-            self.log('d_loss', d_loss)
+            self.log('d_loss', d_loss.detach(), prog_bar=True)
             return d_loss
     
     def set_requires_grad(self, net, requires_grad):
