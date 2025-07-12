@@ -96,3 +96,7 @@ class SRGANLightningModule(pl.LightningModule):
             
             self.log('d_loss', d_loss)
             return d_loss
+    
+    def set_requires_grad(self, net, requires_grad):
+        for p in net.parameters():
+            p.requires_grad = requires_grad
