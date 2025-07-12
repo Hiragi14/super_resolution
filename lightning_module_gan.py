@@ -41,6 +41,8 @@ class SRGANLightningModule(pl.LightningModule):
         self.lr = lr
         self.beta1 = beta1
         self.beta2 = beta2
+        self.content_loss = VGGPerceptualLoss().cuda()
+        self.adversarial_loss = torch.nn.BCEWithLogitsLoss()
 
     def forward(self, x):
         return self.generator(x)
@@ -64,9 +66,12 @@ class SRGANLightningModule(pl.LightningModule):
             sr_images = self.generator(lr_images)
             d_pred = self.discriminator(sr_images.detach().clone())
             
-            # TODO: Define loss functions
+            # Calculate the content loss using VGG perceptual loss, adversarial loss using binary cross-entropy
             content_loss = self.content_loss(sr_images, hr_images)
             adversarial_loss = self.adversarial_loss(d_pred, real_labels)
+            
+            # Combine the content loss and adversarial loss
+            # The weight for adversarial loss can be adjusted based on the desired balance(original paper uses 0.001)
             g_loss_perceptual = content_loss + adversarial_loss*0.001
             self.log_dict({
                 'g_loss_perceptual': g_loss_perceptual,
