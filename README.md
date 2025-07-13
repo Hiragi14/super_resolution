@@ -2,7 +2,7 @@
 - ✅SRCNN
 - ✅EDSR
 - ✅SRResNet
-- 
+- ✅SRGAN
 
 
 ## Citation
