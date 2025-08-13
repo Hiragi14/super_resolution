@@ -51,9 +51,9 @@ class VGGLoss(nn.Module):
         return loss
 
 
-class SRGANLightningModule(pl.LightningModule):
+class ESRGANLightningModule(pl.LightningModule):
     def __init__(self, generator, discriminator, lr=1e-4, beta1=0.9, beta2=0.999):
-        super(SRGANLightningModule, self).__init__()
+        super(ESRGANLightningModule, self).__init__()
         self.automatic_optimization = False
         self.generator = generator
         self.discriminator = discriminator
@@ -61,7 +61,7 @@ class SRGANLightningModule(pl.LightningModule):
         self.beta1 = beta1
         self.beta2 = beta2
         self.content_loss = VGGLoss()
-        self.adversarial_loss = torch.nn.MSELoss() # torch.nn.BCEWithLogitsLoss()
+        # self.adversarial_loss = torch.nn.MSELoss() # torch.nn.BCEWithLogitsLoss()
 
     def forward(self, x):
         return self.generator(x)
@@ -86,59 +86,59 @@ class SRGANLightningModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         lr_images, hr_images = batch
-        opt_generator, opt_discriminator = self.optimizers()
-        
-        # ---- Generator training step ----
-        # fix the discriminator parameters to avoid updating them during generator training
+        opt_g, opt_d = self.optimizers()
+
+        # ======== Generator Step ========
         self.set_requires_grad(self.discriminator, False)
         self.set_requires_grad(self.generator, True)
-        
-        opt_generator.zero_grad()
-        
-        sr_images = self.generator(lr_images)
-        d_pred = self.discriminator(sr_images)
-        
-        # define real and fake labels for the discriminator
-        label_shape = d_pred.shape
-        real_labels = torch.ones(label_shape, device=hr_images.device)
-        
-        # Calculate the content loss using VGG perceptual loss, adversarial loss using binary cross-entropy
-        content_loss = self.content_loss(sr_images, hr_images)
-        adversarial_loss = self.adversarial_loss(d_pred, real_labels)
-        # Combine the content loss and adversarial loss
-        # The weight for adversarial loss can be adjusted based on the desired balance(original paper uses 0.001)
-        g_loss_perceptual = content_loss + adversarial_loss*0.001
-        # Backward pass for generator
-        self.manual_backward(g_loss_perceptual)
-        opt_generator.step()
-        
-        # ---- Discriminator training step ----
-        opt_discriminator.zero_grad()
-        # fix the generator parameters to avoid updating them during discriminator training
-        self.set_requires_grad(self.discriminator, True)
-        self.set_requires_grad(self.generator, False)
-        
+        opt_g.zero_grad()
+
         sr_images = self.generator(lr_images)
         d_real = self.discriminator(hr_images)
-        d_fake = self.discriminator(sr_images.detach())
-        
-        # define real and fake labels for the discriminator
-        real_labels = torch.ones(d_real.size(), device=hr_images.device)
-        fake_labels = torch.zeros(d_fake.size(), device=hr_images.device)
-        real_loss = self.adversarial_loss(d_real, real_labels)
-        fake_loss = self.adversarial_loss(d_fake, fake_labels)
-        d_loss = (real_loss + fake_loss) / 2
+        d_fake = self.discriminator(sr_images)
+
+        # VGG-based perceptual loss
+        content_loss = self.content_loss(sr_images, hr_images)
+
+        # === RaGAN Generator Loss ===
+        d_real_mean = torch.mean(d_real)
+        d_fake_mean = torch.mean(d_fake)
+
+        g_loss = 0.5 * F.mse_loss(d_real - d_fake_mean, torch.ones_like(d_real)) + \
+                0.5 * F.mse_loss(d_fake - d_real_mean, torch.zeros_like(d_fake))
+
+        total_g_loss = content_loss + 0.001 * g_loss
+        self.manual_backward(total_g_loss)
+        opt_g.step()
+
+        # ======== Discriminator Step ========
+        self.set_requires_grad(self.generator, False)
+        self.set_requires_grad(self.discriminator, True)
+        opt_d.zero_grad()
+
+        sr_images = self.generator(lr_images).detach()
+        d_real = self.discriminator(hr_images)
+        d_fake = self.discriminator(sr_images)
+
+        d_real_mean = torch.mean(d_real)
+        d_fake_mean = torch.mean(d_fake)
+
+        d_loss = 0.5 * F.mse_loss(d_real - d_fake_mean, torch.ones_like(d_real)) + \
+                0.5 * F.mse_loss(d_fake - d_real_mean, torch.zeros_like(d_fake))
+
         self.manual_backward(d_loss)
-        opt_discriminator.step()
-        
+        opt_d.step()
+
+        # Logging
         self.log_dict({
-            'g_loss_perceptual': g_loss_perceptual.detach(),
-            'g_loss_content': content_loss.detach(),
-            'g_loss_adv': adversarial_loss.detach(),
+            'g_total_loss': total_g_loss.detach(),
+            'g_content_loss': content_loss.detach(),
+            'g_adv_loss': g_loss.detach(),
             'd_loss': d_loss.detach(),
-            'lr_g': opt_generator.param_groups[0]["lr"],
-            'lr_d': opt_discriminator.param_groups[0]["lr"]
+            'lr_g': opt_g.param_groups[0]['lr'],
+            'lr_d': opt_d.param_groups[0]['lr']
         }, prog_bar=True)
+
     
     def set_requires_grad(self, net, requires_grad):
         for p in net.parameters():

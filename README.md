@@ -3,6 +3,7 @@
 - ✅EDSR
 - ✅SRResNet
 - ✅SRGAN
+- ✅ESRGAN
 
 
 ## Citation
@@ -44,5 +45,33 @@
       archivePrefix={arXiv},
       primaryClass={cs.CV},
       url={https://arxiv.org/abs/1609.04802}, 
+}
+```
+
+- ESRGAN
+- [ESRGAN: Enhanced Super-Resolution Generative Adversarial Networks](https://arxiv.org/abs/1809.00219v2)
+```
+@misc{wang2018esrganenhancedsuperresolutiongenerative,
+      title={ESRGAN: Enhanced Super-Resolution Generative Adversarial Networks}, 
+      author={Xintao Wang and Ke Yu and Shixiang Wu and Jinjin Gu and Yihao Liu and Chao Dong and Chen Change Loy and Yu Qiao and Xiaoou Tang},
+      year={2018},
+      eprint={1809.00219},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/1809.00219}, 
+}
+```
+
+- Real-ESRGAN
+- [Real-ESRGAN: Training Real-World Blind Super-Resolution with Pure Synthetic Data](https://arxiv.org/abs/2107.10833)
+```
+@misc{wang2021realesrgantrainingrealworldblind,
+      title={Real-ESRGAN: Training Real-World Blind Super-Resolution with Pure Synthetic Data}, 
+      author={Xintao Wang and Liangbin Xie and Chao Dong and Ying Shan},
+      year={2021},
+      eprint={2107.10833},
+      archivePrefix={arXiv},
+      primaryClass={eess.IV},
+      url={https://arxiv.org/abs/2107.10833}, 
 }
 ```

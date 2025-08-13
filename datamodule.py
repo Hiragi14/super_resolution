@@ -112,16 +112,17 @@ class DIV2KDataset(Dataset):
 
 
 class DIV2KDataModule(pl.LightningDataModule):
-    def __init__(self, data_dir='data/DIV2K', scale=2, batch_size=16, num_workers=4):
+    def __init__(self, data_dir='data/DIV2K', scale=2, batch_size=16, num_workers=4, gt_size=96):
         super().__init__()
         self.data_dir = data_dir
         self.scale = scale
         self.batch_size = batch_size
         self.num_workers = num_workers
+        self.gt_size = gt_size
 
     def setup(self, stage=None):
-        self.train_ds = DIV2KDataset(self.data_dir, split='train', scale=self.scale)
-        self.val_ds = DIV2KDataset(self.data_dir, split='val', scale=self.scale)
+        self.train_ds = DIV2KDataset(self.data_dir, split='train', scale=self.scale, gt_size=self.gt_size)
+        self.val_ds = DIV2KDataset(self.data_dir, split='val', scale=self.scale, gt_size=self.gt_size)
 
     def train_dataloader(self):
         return DataLoader(self.train_ds, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
